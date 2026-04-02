@@ -57,7 +57,7 @@ async function autoTrade() {
   try {
     const price = await getBTCPrice();
 
-    const res = await fetch("http://localhost:3000/ai", {
+    const res = await fetch(`http://127.0.0.1:${process.env.PORT}/ai`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
