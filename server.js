@@ -96,7 +96,7 @@ async function autoTrade() {
 }
 
 // Run every 15 sec
-setInterval(autoTrade, 15000);
+
 
 // Start server
 const PORT = process.env.PORT || 3000;
