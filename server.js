@@ -7,6 +7,9 @@ dotenv.config();
 const app = express();
 app.use(express.json());
 
+// 1. Defined PORT globally so it can be used in both the server and the fetch call
+const PORT = process.env.PORT || 3000;
+
 // Test route
 app.get("/", (req, res) => {
   res.send("Server is running 🚀");
@@ -28,7 +31,7 @@ app.post("/ai", async (req, res) => {
         messages: [
           {
             role: "user",
-            content: `BTC price: ${price}, RSI: ${rsi}, trend: ${trend}. Should I BUY, SELL or HOLD?`
+            content: `BTC price: ${price}, RSI: ${rsi}, trend: ${trend}. Should I BUY, SELL or HOLD? Respond with only the word.`
           }
         ]
       })
@@ -37,11 +40,11 @@ app.post("/ai", async (req, res) => {
     const data = await response.json();
 
     res.json({
-      decision: data.choices?.[0]?.message?.content || "No response"
+      decision: data.choices?.[0]?.message?.content || "HOLD"
     });
 
   } catch (err) {
-    console.log("Error:", err.message);
+    console.error("AI Route Error:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -52,7 +55,8 @@ let btc = 0;
 
 async function autoTrade() {
   try {
-    const res = await fetch("http://localhost:3000/ai", {
+    // 2. Fix: Use the dynamic PORT variable instead of hardcoded 3000
+    const res = await fetch(`http://localhost:${PORT}/ai`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
@@ -64,8 +68,10 @@ async function autoTrade() {
       })
     });
 
+    if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+
     const data = await res.json();
-    const decision = data.decision;
+    const decision = data.decision ? data.decision.toUpperCase() : "";
 
     console.log("Decision:", decision);
 
@@ -73,25 +79,27 @@ async function autoTrade() {
       let amount = 100;
       btc += amount / 68000;
       balance -= amount;
-      console.log("BUY executed");
-    }
-
-    if (decision.includes("SELL") && btc > 0) {
+      console.log("✅ BUY executed");
+    } else if (decision.includes("SELL") && btc > 0) {
       balance += btc * 68000;
       btc = 0;
-      console.log("SELL executed");
+      console.log("✅ SELL executed");
+    } else {
+      console.log("No action taken (HOLD or insufficient funds/assets)");
     }
 
-    console.log("Balance:", balance, "BTC:", btc);
+    console.log(`Current Balance: $${balance.toFixed(2)} | BTC: ${btc.toFixed(6)}`);
 
   } catch (err) {
-    console.log("AutoTrade Error:", err.message);
+    console.log("AutoTrade Loop Error:", err.message);
   }
 }
 
-// Run every 15 sec
-setInterval(autoTrade, 15000);
-
-// Start server
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+// 3. Fix: Start the server FIRST, then start the interval inside the callback
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+  
+  // Starting the interval here ensures the server is actually listening 
+  // before the first autoTrade attempt is made.
+  setInterval(autoTrade, 15000);
+});
